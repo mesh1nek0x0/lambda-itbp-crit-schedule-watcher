@@ -3,6 +3,10 @@
 const Promise = require('bluebird');
 const phantom = require('phantom');
 const sleep = require('sleep-promise');
+const moment = require('moment');
+const aws = require('aws-sdk');
+const SATURDAY = 6;
+const SUNDAY = 1;
 
 module.exports.handler = (event, context, callback) => {
     return Promise.coroutine(processEvent)(event, context, callback);
@@ -17,7 +21,7 @@ function *processEvent(event, context, callback) {
         instance = yield phantom.create();
         const page = yield instance.createPage();
 
-        let status = yield page.open('https://httpbin.org/');
+        let status = yield page.open('https://calendar.google.com/calendar/embed?src=vf934677bpu4a8pa6gprn1sis8%40group.calendar.google.com&ctz=Asia%2FTokyo');
         console.log(status);
         if (status != 'success') {
             throw new Error('page is not opend');
@@ -29,35 +33,36 @@ function *processEvent(event, context, callback) {
         });
         console.log(title);
 
-        /*** you can pass node js variable to evaluating by Template Literals.
-        (notice) coulud't pass normal variable. ***/
-        let child = 2;
-        const ipLink = yield page.evaluate(function(s) {
-            return document.querySelector(s).innerHTML;
-        }, `#manpage > div.mp > ul:nth-child(6) > li:nth-child(${child})`);
-        console.log(ipLink);
+        // wait for calendar loading complete
+        yield sleep(3000);
 
+        // 今年の経過週から当月最初の経過数を減算することで求まる
+        const pastWeekInYear = moment().week();
+        let weekInThisMonth = pastWeekInYear - moment().startOf('month').week() + 1;
 
-        /*** you can post data with form. ***/
-        status = yield page.open('https://httpbin.org/forms/post');
-        console.log(status);
-        if (status != 'success') {
-            throw new Error('page is not opend');
+        console.log('nth week:', weekInThisMonth);
+
+        let avalable = {
+            'onSat': false,
+            'onSun': false
+        };
+
+        avalable.OnSat = yield page.evaluate(function(s) {
+            return !document.querySelector(s).childElementCount;
+        }, `#mvEventContainer2 > div:nth-child(${weekInThisMonth}) > table.st-grid > tbody > tr:nth-child(2) > td:nth-child(${SATURDAY})`);
+        console.log('resrvation.sat:', avalable.onSat);
+
+        // 最終週の金曜の場合カレンダーをめくり、一週目をみる
+        if (pastWeekInYear == moment().endOf('month').week()) {
+            yield page.evaluate(function() {
+                return document.querySelector('#navForward1').click();
+            });
+            weekInThisMonth = 1;
         }
-        console.log('input custname "hoge"');
-        yield page.evaluate(function() {
-            document.forms[0].custname.value = 'hoge';
-            document.querySelector('body > form > p:nth-child(8) > button').click();
-            // you can also like beloow
-            // document.forms[0].submit();
-        });
-        // wait 2sec
-        yield sleep(2000);
-        // it can be accessd
-        const custname = yield page.evaluate(function () {
-            return JSON.parse(document.querySelector('body > pre').innerHTML).form.custname;
-        });
-        console.log('your custname:', custname);
+        avalable.onSun = yield page.evaluate(function(s) {
+            return !document.querySelector(s).childElementCount;
+        }, `#mvEventContainer2 > div:nth-child(${weekInThisMonth}) > table.st-grid > tbody > tr:nth-child(2) > td:nth-child(${SUNDAY})`);
+        console.log('avalable.onSun:', avalable.onSun);
 
 
     })().then(() => {
