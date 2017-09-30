@@ -50,7 +50,7 @@ function *processEvent(event, context, callback) {
         avalable.OnSat = yield page.evaluate(function(s) {
             return !document.querySelector(s).childElementCount;
         }, `#mvEventContainer2 > div:nth-child(${weekInThisMonth}) > table.st-grid > tbody > tr:nth-child(2) > td:nth-child(${SATURDAY})`);
-        console.log('resrvation.sat:', avalable.onSat);
+        console.log('avalable.onSat:', avalable.onSat);
 
         // 最終週の金曜の場合カレンダーをめくり、一週目をみる
         if (pastWeekInYear == moment().endOf('month').week()) {
@@ -63,6 +63,56 @@ function *processEvent(event, context, callback) {
             return !document.querySelector(s).childElementCount;
         }, `#mvEventContainer2 > div:nth-child(${weekInThisMonth}) > table.st-grid > tbody > tr:nth-child(2) > td:nth-child(${SUNDAY})`);
         console.log('avalable.onSun:', avalable.onSun);
+
+        let message = {
+            "channel": process.env.SLACK_CHANNEL,
+            "emoji": process.env.SLACK_EMOJI,
+            "username": "lambda-itbp-crit-schedule-watcher",
+            "attachments": [
+                {
+                    "color": "",
+                    "pretext": "今週はあのスペースが...",
+                    "title": "ITビジネスプラザ武蔵サロンスペースイベント情報",
+                    "title_link": "https://calendar.google.com/calendar/embed?src=vf934677bpu4a8pa6gprn1sis8%40group.calendar.google.com&ctz=Asia%2FTokyo",
+                    "text": "Optional text that appears within the attachment",
+                    "fields": [
+                        {
+                            "title": "Saturday",
+                            "value": avalable.onSat ? "予約あり" : "空き",
+                            "short": true
+                        },
+        				{
+                            "title": "Sunday",
+                            "value": avalable.onSun ? "予約あり" : "空き",
+                            "short": true
+                        }
+                    ],
+                    "footer": "lambda-itbp-crit-schedule-watcher",
+                    "footer_icon": "https://platform.slack-edge.com/img/default_application_icon.png"
+                }
+            ]
+        }
+
+        if (avalable.onSat && avalable.onSun) {
+            message.attachments[0].color = 'good';
+        } else if (avalable.onSat || avalable.onSun) {
+            message.attachments[0].color = 'warning';
+        } else {
+            message.attachments[0].color = 'danger';
+        }
+
+        var awParam = {
+            FunctionName: "notify-slack",
+            InvokeArgs: JSON.stringify(message)
+        };
+        lambda.invokeAsync(awParam, function(err, data) {
+            if(err) {
+                console.log('invoke notify-slack is fail');
+                throw err;
+            }
+        });
+
+        console.log(JSON.stringify(message));
 
 
     })().then(() => {

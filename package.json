@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "setup": "node-lambda setup",
-    "start": "node-lambda run",
+    "start": "node-lambda run -f deploy.env",
     "package": "node-lambda package",
     "deploy": "node-lambda deploy -f deploy.env",
     "test": "echo \"Error: no test specified\" && exit 1"
