@@ -5,6 +5,7 @@ const phantom = require('phantom');
 const sleep = require('sleep-promise');
 const moment = require('moment');
 const aws = require('aws-sdk');
+const lambda = new aws.Lambda({region: 'us-east-1'});
 const SATURDAY = 6;
 const SUNDAY = 1;
 
